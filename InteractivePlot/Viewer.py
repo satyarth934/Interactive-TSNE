@@ -1,3 +1,4 @@
+import torch
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -142,26 +143,41 @@ class InteractivePlot:
     
     def showcluster(self,x,y):
         """Mark some objects and show images"""
+
         j = self.select_sample(x,y)
         self.label.set_text(f"x={x:.3f} y={y:.3f}")
         i = self.tcl[j[0]]
         if self.prevplt is not None:
             [x.remove() for x in self.prevplt]
+        
         for sp in self.subplots:
             sp.clear()
             sp.set_axis_off()
-        self.prevplt = self.ptsne.plot(self.tsne_obj[j,0],self.tsne_obj[j,1],'ks',
+        
+        self.prevplt = self.ptsne.plot(self.tsne_obj[j,0],
+                                       self.tsne_obj[j,1],
+                                       'ks',
                                        label=f'Cl {i} ({self.clcount[i]} members)',
-                                       fillstyle='none')
+                                       fillstyle='none'
+                                    )
         self.ptsne.legend(loc='upper right')
         self.plotobjects = [None]*len(self.subplots)
+        
+        filename_list = [tup[1] for tup in self.objects]
+        clust_name_list = [tup[0] for tup in self.objects]
+
         for isp, k in enumerate(j):
-            im = Image.open(self.objects['filename'][k])
+            # im = Image.open(self.objects['filename'][k])
+            data_blob = torch.load(filename_list[k])
+            data_blob = data_blob[..., 2]
+            im = data_blob.mean(axis=0)
+
             sp = self.subplots[isp]
             pim = sp.imshow(im,cmap='gray',origin='upper')
             self.plotobjects[isp] = k
             cdist = self.pdist[k,j[0]]
-            sp.set_title("{} ({:.1f},{:.1f}) {:.3f}".format(self.objects['name'][k],self.tsne_obj[k,0],self.tsne_obj[k,1],cdist),
+            # sp.set_title("{} ({:.1f},{:.1f}) {:.3f}".format(self.objects['name'][k],self.tsne_obj[k,0],self.tsne_obj[k,1],cdist),
+            sp.set_title("{} ({:.1f},{:.1f}) {:.3f}".format(clust_name_list[k],self.tsne_obj[k,0],self.tsne_obj[k,1],cdist),
                         size=8)
 
     @save_errors
@@ -183,8 +199,9 @@ class InteractivePlot:
                 return
             x = self.tsne_obj[j,0]
             y = self.tsne_obj[j,1]
-        except ValueError:
+        except ValueError as e:
             pass
+
         self.showcluster(x,y)
 
 
