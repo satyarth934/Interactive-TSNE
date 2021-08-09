@@ -44,7 +44,7 @@ class PrepareDataGLMLatent:
     """
 
     def __init__(
-        self, csv_path, data_dir, method="tsne", perplexity=30, n_jobs=4, n_neighbors=5
+        self, csv_path, data_dir=None, method="tsne", perplexity=30, n_jobs=4, n_neighbors=5
     ):
         # self.model = model
         # self.data_path = DATA_PATH
@@ -243,10 +243,14 @@ class PrepareDataGLMLatent:
         # objects = self.object_creation(ims)
 
         assigned_clusters = self.encoded_samples["assigned_clusters"]
-        filenames = [
-            os.path.join(self.data_dir, f)
-            for f in self.encoded_samples["input_data_filename"]
-        ]
+        
+        if self.data_dir is None:
+            filenames = self.encoded_samples["input_data_filename"]
+        else:
+            filenames = [
+                os.path.join(self.data_dir, f)
+                for f in self.encoded_samples["input_data_filename"]
+            ]
         objects = [_ for _ in zip(assigned_clusters, filenames)]
 
         return tsne_obj, spd, cl, objects

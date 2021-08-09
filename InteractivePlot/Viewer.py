@@ -191,10 +191,16 @@ class InteractivePlot:
         clust_name_list = [tup[0] for tup in self.objects]
 
         for isp, k in enumerate(j):
+            
             # im = Image.open(self.objects['filename'][k])
-            data_blob = torch.load(filename_list[k])
-            data_blob = data_blob[..., 2]
-            im = data_blob.mean(axis=0)
+            if filename_list[k].split(".")[-1] == "pt":
+                data_blob = torch.load(filename_list[k])
+                data_blob = data_blob[..., 2]
+                im = data_blob.mean(axis=0)
+            elif filename_list[k].split(".")[-1] == "npy":
+                data_blob = np.load(filename_list[k])
+                data_blob = data_blob[..., 2]
+                im = data_blob.mean(axis=0)
 
             sp = self.subplots[isp]
             pim = sp.imshow(im, cmap="gray", origin="upper")
