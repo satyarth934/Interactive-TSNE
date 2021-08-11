@@ -47,6 +47,7 @@ class InteractivePlot:
         tcl,
         tsne_obj,
         objects,
+        mode='2D',
         spd=None,
         nside=4,
         filename=None,
@@ -67,9 +68,11 @@ class InteractivePlot:
             Then highlightpars can be a dict with plot properties as parameters
             to pyplot.scatter
         """
+
         self.tcl = tcl
         self.tsne_obj = tsne_obj
         self.objects = objects
+        self.mode = mode    # can be '2D' or '3D'
         self.clcount = np.bincount(self.tcl)
         self.nside = nside
         self.filename = filename
@@ -111,11 +114,18 @@ class InteractivePlot:
             iplot = iplot + 1
             if (iplot % (2 * nside)) == 1:
                 iplot = iplot + nside
-            self.subplots.append(self.fig.add_subplot(nside, 2 * nside, iplot))
-            self.subplots[-1].set_axis_off()
+            
+            if self.mode == '2D':
+                self.subplots.append(self.fig.add_subplot(nside, 2 * nside, iplot))
+                self.subplots[-1].set_axis_off()
+            elif self.mode == '3D':
+                self.subplots.append(self.fig.add_subplot(nside, 2 * nside, iplot, projection='3d'))
+            else:
+                raise ValueError("Incorrect value for plot mode.")
+
             self.subplots[-1].set_title(f"Sample {i+1}", size=9)
         self.plotobjects = [None] * len(self.subplots)
-        self.fig.tight_layout()
+        # self.fig.tight_layout()
         self.saved = False
         self.fig.canvas.mpl_connect("close_event", self.close)
         self.cid = self.fig.canvas.mpl_connect("button_press_event", self.onclick)
@@ -175,7 +185,9 @@ class InteractivePlot:
 
         for sp in self.subplots:
             sp.clear()
-            sp.set_axis_off()
+
+            if self.mode == '2D':
+                sp.set_axis_off()
 
         self.prevplt = self.ptsne.plot(
             self.tsne_obj[j, 0],
@@ -190,29 +202,72 @@ class InteractivePlot:
         filename_list = [tup[1] for tup in self.objects]
         clust_name_list = [tup[0] for tup in self.objects]
 
+        # selected_filenames = list()
+
         for isp, k in enumerate(j):
             
             # im = Image.open(self.objects['filename'][k])
             if filename_list[k].split(".")[-1] == "pt":
                 data_blob = torch.load(filename_list[k])
-                data_blob = data_blob[..., 2]
-                im = data_blob.mean(axis=0)
+                if len(data_blob.shape) > 3:
+                    data_blob = data_blob[..., 2]   # selecting intensity channel
+                im = data_blob.mean(axis=0) if self.mode == '2D' else data_blob
             elif filename_list[k].split(".")[-1] == "npy":
                 data_blob = np.load(filename_list[k])
-                data_blob = data_blob[..., 2]
-                im = data_blob.mean(axis=0)
+                if len(data_blob.shape) > 3:
+                    data_blob = data_blob[..., 2]   # selecting intensity channel
+                im = data_blob.mean(axis=0) if self.mode == '2D' else data_blob
 
             sp = self.subplots[isp]
-            pim = sp.imshow(im, cmap="gray", origin="upper")
+            
+            if self.mode == '2D':
+                pim = sp.imshow(im, cmap="gray", origin="upper")
+            else:
+                idxs = np.where(im != 0)
+                pim = sp.scatter(idxs[0], 
+                                 idxs[1], 
+                                 idxs[2], 
+                                 marker = '.',
+                                 s=50., 
+                                 alpha=0.75)
+                sp.set_xlabel("time")
+                sp.set_ylabel("x")
+                sp.set_zlabel("y")
+
+                sp.axes.set_xlim3d(left=0, right=250) 
+                sp.axes.set_ylim3d(bottom=0, top=32) 
+                sp.axes.set_zlim3d(bottom=0, top=32) 
+
+                # sp.axes.xaxis.set_visible(False)
+                # sp.axes.yaxis.set_visible(False)
+                # sp.axes.zaxis.set_visible(False)
+
             self.plotobjects[isp] = k
             cdist = self.pdist[k, j[0]]
             # sp.set_title("{} ({:.1f},{:.1f}) {:.3f}".format(self.objects['name'][k],self.tsne_obj[k,0],self.tsne_obj[k,1],cdist),
-            sp.set_title(
-                "{} ({:.1f},{:.1f}) {:.3f}".format(
-                    clust_name_list[k], self.tsne_obj[k, 0], self.tsne_obj[k, 1], cdist
-                ),
-                size=8,
-            )
+            
+            # sp.set_title(
+            #     "{} ({:.1f},{:.1f}) {:.3f}".format(
+            #         clust_name_list[k], self.tsne_obj[k, 0], self.tsne_obj[k, 1], cdist
+            #     ),
+            #     size=8,
+            # )
+
+            # selected_filenames.append(filename_list[isp])
+
+            # To wrap text
+            # "\n".join(wrap(f"{clust_name_list[k]}_{filename_list[isp]}", 15))
+            # sp.set_title(
+            #     f"{clust_name_list[k]}_{os.path.basename(filename_list[isp])}",
+            #     size=8,
+            # )
+        
+        # # Saving the selected filenames
+        # of = open("selected_filenames.txt", 'w')
+        # print("selected_filenames:\n", selected_filenames, file=of)
+        # print("------", file=of)
+        # of.close()
+
 
     @save_errors
     def onclick(self, event):

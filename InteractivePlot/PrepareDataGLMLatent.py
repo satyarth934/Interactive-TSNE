@@ -44,21 +44,26 @@ class PrepareDataGLMLatent:
     """
 
     def __init__(
-        self, csv_path, data_dir=None, method="tsne", perplexity=30, n_jobs=4, n_neighbors=5
+        self, csv_path, cluster_label_colname, data_dir=None, method="tsne", perplexity=30, n_jobs=4, n_neighbors=5
     ):
         # self.model = model
         # self.data_path = DATA_PATH
 
+        self.metric = "euclidean"   # 'euclidean' or 'cosine'
+
         self.csv_path = csv_path
+        self.cluster_label_colname = cluster_label_colname
         self.data_dir = data_dir
         self.encoded_samples = pd.read_csv(self.csv_path)
         # self.encoded_samples = self.encoded_samples.iloc[:500]  # TODO: Only to speed up testing - GET RID OF THIS IN THE FINAL RUN
-        self.embeddings = self.encoded_samples.iloc[:, :16].values
-        # self.embeddings = self.get_matrix(MODEL_PATH = model, DATA_PATH = DATA_PATH, output_size = output_size)
 
+        temp_list = [int(cn.strip("latent_")) for cn in self.encoded_samples.columns if "latent_" in cn and cn.strip("latent_").isdigit()]
+        last_latent_column = max(temp_list)
+        self.embeddings = self.encoded_samples.iloc[:, :last_latent_column].values
+        # self.embeddings = self.get_matrix(MODEL_PATH = model, DATA_PATH = DATA_PATH, output_size = output_size)
         # self.ims = self.get_images(DATA_PATH)
 
-        self.num_clusters = len(self.encoded_samples["assigned_clusters"].unique())
+        self.num_clusters = len(self.encoded_samples[self.cluster_label_colname].unique())
         self.tsne_obj, self.spd, self.cl, self.objects = self.variable_gen(
             self.embeddings, self.num_clusters, method, perplexity, n_jobs, n_neighbors
         )
@@ -151,7 +156,7 @@ class PrepareDataGLMLatent:
         verbose = 1
         perplexity = perplexity
         n_iter = 1000
-        metric = "euclidean"
+        metric = self.metric
         n_jobs = n_jobs
 
         time_start = time.time()
@@ -176,7 +181,7 @@ class PrepareDataGLMLatent:
             n_components=2,
             verbose=1,
             n_jobs=n_jobs,
-            metric="euclidean",
+            metric=self.metric,
         )
 
         u = fit.fit_transform(feature_list)
@@ -201,7 +206,7 @@ class PrepareDataGLMLatent:
         """
 
         z = linkage(embeddings, method="centroid")
-        pdt = pdist(embeddings, metric="euclidean")
+        pdt = pdist(embeddings, metric=self.metric)
         if method == "umap":
             tsne_obj = self.fit_umap(embeddings, n_neighbors, n_jobs)
         elif method == "tsne":
@@ -242,7 +247,7 @@ class PrepareDataGLMLatent:
         )
         # objects = self.object_creation(ims)
 
-        assigned_clusters = self.encoded_samples["assigned_clusters"]
+        assigned_clusters = self.encoded_samples[self.cluster_label_colname]
         
         if self.data_dir is None:
             filenames = self.encoded_samples["input_data_filename"]
